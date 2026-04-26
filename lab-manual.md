@@ -33,22 +33,7 @@ By the end of this lab, you will be able to:
 4. **Justify a tech stack choice** based on user needs, not personal preference
 5. **Manage environment variables** securely using `.env` files and `.gitignore`
 6. **Create a system map** showing the data flow between user, frontend, API, and database, with pain points circled based on the staff interview
-7. **Write 2 assert statements for API responses** that verify the data returned from your **Component B** external API meets expected structure (e.g., response contains expected keys, values are within plausible ranges). Commit them in your repo and list their file path in the README (see **Component D Deliverables**).
-
----
-
-## Pre-Lab Checklist
-
-Complete these steps before starting your labs.
-
-- [ ] **Supabase account** created at [supabase.com](https://supabase.com) (sign up with GitHub recommended)
-- [ ] **Supabase project** created: name it `techin510-lab5`, region "West US", write down your database password
-- [ ] **Vercel account** created at [vercel.com](https://vercel.com) (sign up with GitHub recommended)
-- [ ] **Node.js 20+** installed (`node --version` should show v20 or higher). Download from [nodejs.org](https://nodejs.org) (LTS version)
-- [ ] **npm** available (`npm --version`)
-- [ ] **At least one API key** obtained if your chosen API requires one (see the Curated API List below). APIs marked "None" require no key.
-- [ ] **Cursor** installed and configured
-- [ ] **Git** configured and you can push to GitHub
+7. **Write assert statements for API responses**.
 
 ---
 
@@ -56,7 +41,7 @@ Complete these steps before starting your labs.
 
 ### Guest: Maason Kao — Equipment Checkout Returns
 
-**Maason** manages the equipment checkout and return process at GIX. His pain point centers on getting students to return checked-out equipment, using an existing workflow that spans multiple systems: BlueTally for reporting, Power Automate for automation, and email-based notifications.
+**Maason** manages the equipment checkout and return process at GIX. His pain point centers on getting students to return checked-out equipment, using an existing workflow that spans multiple systems.
 
 
 ### Synthesis Artifact: System Map Sketch
@@ -66,8 +51,7 @@ After the interview, sketch the work and data flows of your interviewee, with pa
 ### Mark System Touchpoints
 
 On your system map, mark every point where a **user directly interacts with the system**. A touchpoint is any moment where a person does something: clicks a button, fills out a form, reads a notification, receives an email, or makes a decision based on what they see on screen.
-
-Use a distinct marker (a star, a circle, or a different color) for each touchpoint. For each one, annotate:
+Pick two touchpoints, annotate:
 
 - **Who** is the user at this point? (operations / IT staff? a student? another role?)
 - **What** are they doing? (submitting a form, reading a status, making a decision)
@@ -75,118 +59,19 @@ Use a distinct marker (a star, a circle, or a different color) for each touchpoi
 
 Each touchpoint may indicate a screen or interaction your app needs to support. If the interviewee mentions checking something "on their phone while walking between buildings," that is a signal your app needs to work on a narrow screen. If they describe a workflow where two people hand off information, that may require authentication or multi-user support. These touchpoint annotations directly inform your tech stack decision framework below.
 
-**Connection to tech stack choice:** Count your touchpoints. If there are multiple users at different touchpoints, that is a strong signal for Next.js with a database (multi-user, persistent data). We start with Supabase as that database so everyone shares the same setup and docs; in other contexts you might use PostgreSQL, Firebase, or another backend. If there is a single user at one or two touchpoints, Streamlit may be sufficient.
-
 ### Build Mandate
 
 Your interview findings must directly shape what you build in Component B. Complete this sentence before writing any code:
 
 > "Based on the interview, I will build **[specific feature/app]** because the interviewee said **[direct quote or paraphrased finding]**, which means **[design decision it drives]**."
 
-This traces your code back to your research. If you cannot complete this sentence, re-read your interview notes.
-
 ---
 
 ## Component B: Lab
 
-### Warm-up — Visual Reasoning
-
-Take the system map you just drew by hand and describe the interviewee's system architecture in plain text to an AI (Claude, ChatGPT, or your tool of choice). Ask it to generate a diagram description (e.g., a Mermaid diagram or structured text layout). Compare the AI-generated version with your hand-drawn system map.
-
-Reflect briefly: Which captured more detail: your sketch or the AI's interpretation? What did the AI miss? What did it add/miss?
-
----
-
-### PRIMM Exercise: Reading the Next.js App Router
-
-*This exercise applies the PRIMM method (Predict → Run → Investigate → Modify → Make) to the Next.js App Router file structure. It bridges the gap between Streamlit's single-file model and Next.js's folder-based routing.*
-
-**The single most important thing to understand about Next.js** is that **file location = URL**. This is App Router routing:
-
-```
-src/app/page.tsx              →  localhost:3000/
-src/app/dashboard/page.tsx    →  localhost:3000/dashboard
-src/app/login/page.tsx        →  localhost:3000/login
-src/app/settings/page.tsx     →  localhost:3000/settings
-```
-
-There is no routing configuration file. The folder structure *is* the routing. Create a folder, add a `page.tsx`, and you have a new URL. If port 3000 is already in use on your machine, Next.js may pick another port or fail to start—use the URL shown in your terminal (or follow the port conflict steps in Troubleshooting) instead of assuming localhost:3000.
-
-Compare this to Streamlit:
-
-```
-STREAMLIT (one file, all routes)     NEXT.JS APP ROUTER (folder = route)
-────────────────────────────────     ────────────────────────────────────
-app.py                               src/app/page.tsx       (→ /)
-  └── if page == "dashboard":          src/app/dashboard/
-        show_dashboard()                 └── page.tsx       (→ /dashboard)
-  └── if page == "login":             src/app/login/
-        show_login()                     └── page.tsx       (→ /login)
-```
-
-**Step 1 — PREDICT:** Before running anything, answer these questions in writing:
-
-1. If you create a file at `src/app/profile/page.tsx`, what URL will it map to?
-2. The file `src/app/layout.tsx` exists at the root of `app/`. What do you think it does?
-3. **Hooks primer (read, then predict):** Streamlit uses `st.session_state` to remember values between reruns. In React **client components**, **`useState`** and **`useEffect`** are built-in *hooks* (functions from `"react"` whose names start with `use`).
-   - **`useState(initial)`** returns a pair: the current value and an updater function (often written `const [value, setValue] = useState(initial)`). Calling the updater schedules a re-render so the UI can reflect the new value. **`useState([])`** means “start with an empty array as the initial state.”
-   - **`useEffect(() => { ... }, dependencyArray)`** runs your function **after** the component renders, and can run again when values in that dependency array change. Typical uses: **`fetch()`** to load remote data, timers, or subscribing to browser APIs—anything that **syncs the component with the outside world**. Direct user actions (clicks, typing) usually go in event handlers (`onClick`, etc.), not in `useEffect`.
-
-   **Predict:** After reading the above, what do you expect `useState([])` to give you on the first render? When might you pair it with `useEffect` (for example, to load items from an API into that array)?
-
-**Step 2 — RUN:** Open the Week 5 starter kit and run it:
-
-```bash
-cd "week 5/starter-kit/app-template"
-npm install
-npm run dev
-```
-
-Navigate to `localhost:3000`, `localhost:3000/dashboard`, and `localhost:3000/login`. Observe what each page shows.
-
-**Step 3 — INVESTIGATE:** Open each file and answer:
-
-| File | What does it display? | Does it have "use client" at the top? | Does it use useState or useEffect? |
-|------|----------------------|---------------------------------------|------------------------------------|
-| `src/app/page.tsx` | | | |
-| `src/app/dashboard/page.tsx` | | | |
-| `src/app/login/page.tsx` | | | |
-| `src/app/layout.tsx` | | | |
-
-**Key question:** The `layout.tsx` file wraps every page in the app. Open it. What HTML does it share across all pages? (Hint: look for the Navbar component.)
-
-**Step 4 — MODIFY:** Make one small change that confirms your understanding:
-
-1. Open `src/app/page.tsx`
-2. Find the heading text (something like "Welcome" or the app name)
-3. Change it to your name: `<h1>Hello from [Your Name]</h1>`
-4. Save the file and watch the browser auto-refresh (Hot Module Replacement)
-5. Navigate to `/dashboard` — did the heading change there too? Why or why not?
-
-**Step 5 — MAKE:** Create a new page from scratch:
-
-1. Create the folder: `src/app/about/`
-2. Create the file: `src/app/about/page.tsx`
-3. Add minimal content:
-   ```typescript
-   export default function AboutPage() {
-     return (
-       <div>
-         <h1>About This App</h1>
-         <p>Built for TECHIN 510, Week 5.</p>
-       </div>
-     );
-   }
-   ```
-4. Navigate to `localhost:3000/about` — you just created a new URL.
-
-**Reflection (write in your AI Usage Log):** How does the App Router model (file = route) change how you think about building a multi-page application, compared to Streamlit's `st.selectbox` navigation pattern?
-
----
-
 ### Tech Stack Decision Framework
 
-Starting this week, you choose your stack. Use this framework to decide:
+Starting this week, you choose your stack. Below is an example framework for choosing tech stack:
 
 | Factor | Choose Streamlit | Choose Next.js + Supabase |
 |--------|-----------------|--------------------------|
@@ -199,235 +84,15 @@ Starting this week, you choose your stack. Use this framework to decide:
 | **Build speed** | Fastest for Python developers | Fastest for web developers |
 | **Example** | "Show staff a dashboard of system statuses" | "Let multiple staff log incidents and track resolution" |
 
-Write your tech stack choice and a 1-sentence justification in your Spec Checkpoint.
+Write your tech stack choice for the app to be built for interviewee and a 1-sentence justification in your Spec Checkpoint.
 
----
+### Constraints: 
 
-### Level 1: API Exploration
+Use Supabase as your database. Read the [docs here](https://supabase.com/docs/guides/database/overview)
 
-**Goal:** Call a public REST API and display the results in a simple page.
+Report your data schema.
 
-#### If you chose Streamlit (Python):
-
-Create your project and virtual environment. Create `requirements.txt`:
-```
-streamlit>=1.38.0,<2.0
-requests>=2.31.0,<3.0
-python-dotenv>=1.0.0,<2.0
-pandas>=2.1.0,<3.0
-supabase>=2.10.0,<3.0
-```
-
-Create a file: `.env.example`:
-
-```bash
-# Copy to .env and fill in your keys: cp .env.example .env
-
-# Only needed if your API requires a key:
-# OPENWEATHER_API_KEY=your_key_here
-# NEWS_API_KEY=your_key_here
-# NASA_API_KEY=DEMO_KEY
-# GITHUB_TOKEN=your_token_here
-
-# Supabase (used in Level 2):
-# SUPABASE_URL=https://your-project-id.supabase.co
-# SUPABASE_KEY=your-anon-key-here
-```
-Initialize git and create `.gitignore`. Note that your secrets and env files should be included in `.gitignore`.
-
-**What you build -- `app.py`:**
-
-Implement a small Streamlit app that calls **one public REST API** and shows **live** results on the page (table, list, or cards -- your choice).
-
-- **Suggested API (optional):** [Open-Meteo](https://open-meteo.com/) forecast API needs no API key. Pick latitude/longitude and which daily fields you want (e.g. max/min temperature, precipitation). You may use a different public API if you prefer; some require keys in `.env` (see `.env.example` comments).
-- **HTTP:** Use `requests` (or equivalent) with query parameters, and always set a **request timeout**.
-- **Errors:** Handle failures users actually hit -- at minimum timeout, HTTP errors, and connection errors -- and show **clear messages in the UI** (not a silent failure or a raw stack trace).
-- **Performance:** Avoid refetching the same API response on every rerun when it is not necessary; Streamlit’s **`st.cache_data`** with a TTL is the intended pattern for cached fetches.
-- **Layout:** At least a page title and your data view. Optional: a sidebar (e.g. location or parameter choices).
-
-When it works:
-
-```bash
-streamlit run app.py
-```
-
-#### If you chose Next.js (TypeScript):
-
-```bash
-npx create-next-app@latest techin510-week5
-```
-
-When prompted, accept: TypeScript Yes, ESLint Yes, Tailwind Yes, `src/` directory Yes, App Router Yes. Defaults are fine for everything else.
-
-```bash
-cd techin510-week5
-npm run dev
-```
-
-Open `src/app/page.tsx` and implement the page yourself (or use a coding agent with **your own** prompt). Requirements:
-
-- Call **one public REST API** and render **live** data (table, list, or cards).
-- Use the browser **`fetch`** API. A common pattern is to run the request inside **`useEffect`** on the client; if you use hooks and event handlers, the file needs **`"use client"`** at the top.
-- Show a **loading** state while the request is in flight.
-- Show an **error** state if the request fails (network error, non-OK response, or invalid JSON) -- user-visible, not only `console.error`.
-- Optional: [Open-Meteo](https://open-meteo.com/) is a good no-key default (pick location and fields); other APIs may need env vars.
-
-**Level 1 Checkpoint:** You should see live data from your API displayed on screen -- a table, a list, or cards. If you see data, Level 1 is complete.
-
----
-
-### Level 2: Supabase Setup
-
-**Goal:** Create a Supabase table, insert sample data, and read it from your app.
-
-#### Step 1: Verify Your Supabase Project
-
-Go to [supabase.com/dashboard](https://supabase.com/dashboard) and confirm `techin510-lab5` shows a green status.
-
-#### Step 2: Create a Table
-
-In the Supabase dashboard, click **Table Editor** > **Create a new table**.
-
-Configure a table relevant to IT monitoring (or use the default bookmarks table):
-
-**Option A -- IT Incident Log:**
-
-| Column | Type | Default | Nullable | Notes |
-|--------|------|---------|----------|-------|
-| `id` | int8 | (auto) | No | Primary key (auto-generated) |
-| `created_at` | timestamptz | `now()` | No | Already exists by default |
-| `system_name` | text | (none) | No | e.g., "Wi-Fi", "Printer", "Room Display" |
-| `status` | text | `'operational'` | No | "operational", "degraded", "down" |
-| `description` | text | (none) | Yes | Notes about the incident |
-| `reported_by` | text | (none) | Yes | Who reported it |
-
-**Option B -- Bookmarks (simpler):**
-
-| Column | Type | Default | Nullable | Notes |
-|--------|------|---------|----------|-------|
-| `id` | int8 | (auto) | No | Primary key |
-| `created_at` | timestamptz | `now()` | No | Default |
-| `title` | text | (none) | No | Bookmark title |
-| `url` | text | (none) | No | Bookmark URL |
-| `category` | text | `'general'` | No | Category |
-| `description` | text | (none) | Yes | Optional notes |
-
-**Important:** Turn Row Level Security (RLS) OFF for now. We will learn RLS later.
-
-Click **Save**, then test by clicking **Insert row** and adding a sample row manually.
-
-#### Step 3: Get Your Credentials
-
-Go to **Project Settings** > **API** in the Supabase dashboard. Copy:
-- **Project URL** (e.g., `https://abcdefgh.supabase.co`)
-- **anon (public) key** (starts with `eyJ...`)
-
-Add these to your `.env` file (Streamlit) or `.env.local` file (Next.js):
-
-**For Streamlit (`.env`):**
-```bash
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_KEY=your-anon-key-here
-```
-
-**For Next.js (`.env.local`):**
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
-```
-
-#### Step 4: Connect from Code
-
-**Streamlit path** -- create `db_app.py` (or extend your existing app in a new file). Implement it yourself; requirements:
-
-- Load **`SUPABASE_URL`** and **`SUPABASE_KEY`** from the environment (after `load_dotenv()`). If either is missing, show a clear error and **`st.stop()`**.
-- Create a Supabase client with **`create_client`** from the `supabase` package.
-- **Create:** A form (or equivalent) that **inserts** a new row into **the table you created in Step 2** (`incidents` or `bookmarks` -- use the real table name).
-- **Read:** After load or after a change, **select** all rows, ordered by **`created_at`** descending, and display them (table, expanders, or list).
-- **Delete:** A way to **delete** one row at a time (e.g. by `id`). Confirm deletes refresh the UI (e.g. `st.rerun()` after success).
-- **Schema alignment:**
-  - **Option A (`incidents`):** Form fields should map to your columns, at minimum `system_name`, `status`, and optional `description` (and `reported_by` if you added it).
-  - **Option B (`bookmarks`):** Map to `title`, `url`, `category`, and optional `description` -- not the incident field names.
-- Handle Supabase errors in the UI (try/except or check the client response) so failed inserts/deletes are visible.
-
-```bash
-streamlit run db_app.py
-```
-
-**Next.js path** -- install the Supabase client and wire up a page:
-
-```bash
-npm install @supabase/supabase-js
-```
-
-Add **`src/lib/supabase.ts`**: export a Supabase client from **`@supabase/supabase-js`** using **`NEXT_PUBLIC_SUPABASE_URL`** and **`NEXT_PUBLIC_SUPABASE_ANON_KEY`** from `process.env`. Do not commit `.env.local` or paste real keys into source files.
-
-Implement **`src/app/status/page.tsx`** (path name may vary) as a **`"use client"`** page that:
-
-- Imports your shared client from `@/lib/supabase` (or your chosen alias).
-- **Reads** rows from **your** Step 2 table, ordered by `created_at` descending, with **loading** and **error** states.
-- **Inserts** new rows via a form whose fields match **Option A** (`system_name`, `status`, `description`, etc.) or **Option B** (`title`, `url`, `category`, `description`).
-- Provides **delete** per row (by `id`).
-- Uses **Tailwind** for basic layout. Use your own agent prompt or code; the table name and columns must match what you created in Supabase, not a fixed template.
-
-**Level 2 Checkpoint:** You can add a row through your app, refresh the page, and the row persists. You can delete a row and it disappears. Data survives a page refresh because it lives in the database.
-
----
-
-### Level 3: Next.js Scaffolding
-
-**Goal:** If you have not already created a Next.js project, do so now. If you already did (choosing Next.js in Level 1), skip to understanding the file structure.
-
-```bash
-npx create-next-app@latest my-techin510-app
-```
-
-Accept the recommended defaults (TypeScript, Tailwind, App Router, `src/` directory).
-
-#### Understanding the File Structure
-
-```
-my-techin510-app/
-  src/
-    app/
-      layout.tsx      # Shared layout wrapper (nav, footer)
-      page.tsx         # Home page (the "/" route)
-      globals.css      # Global styles
-  public/              # Static assets (images, icons)
-  package.json         # Dependencies and scripts
-  .env.local           # Environment variables (create this yourself)
-  next.config.ts       # Next.js configuration
-  tsconfig.json        # TypeScript configuration
-```
-
-**Note:** The exact files and names above are a guide. **`create-next-app` output changes with Next.js version**, so your tree may not match line-for-line. If you use an **AI coding assistant** to scaffold or write features, what you get can also **differ from run to run or from a classmate’s repo**—that is normal. Check your work against the **concepts** in this section (routes, `layout`, client vs server components), not an identical folder snapshot.
-
-Key concepts:
-- **`app/page.tsx`** is the home page. Every `page.tsx` inside a folder becomes a route (e.g., `app/about/page.tsx` becomes `/about`).
-- **`app/layout.tsx`** wraps every page. Put navigation here.
-- **`"use client"`** at the top of a file means it runs in the browser (needed for `useState`, `useEffect`, event handlers).
-- **Files without `"use client"`** are Server Components -- they run on the server and can fetch data directly.
-
-JSX is JavaScript that looks like HTML. Use `className` instead of `class`. Embed JavaScript in `{curly braces}`. Components are functions that return JSX.
-
-**Level 3 Checkpoint:** Run `npm run dev` and see the default Next.js page at `http://localhost:3000`. You can explain what `page.tsx`, `layout.tsx`, and `"use client"` do.
-
----
-
-### Level 4: Connect Everything
-
-**Goal:** Build an app that fetches from an external API AND reads/writes to Supabase.
-
-**Example:** A system status dashboard that:
-- Pulls weather data from Open-Meteo (external API) to show if outdoor systems might be affected
-- Stores incident logs in Supabase so staff have a persistent record
-- Displays a combined view with traffic-light status indicators (green/yellow/red)
-
-Combine your Level 1 API work with your Level 2 Supabase work into **one** app (same page or clearly linked views). Your external API and Supabase table can differ from the example below -- adapt names and fields to what you actually built.
-
-**Example merge brief (write your own prompt or implement directly):** (1) Fetch weather (or your Level 1 API) and show the key fields you care about. (2) Read/write your Supabase data -- **`incidents`** or **`bookmarks`**, with the columns from Step 2. (3) If you use status-like fields (e.g. Option A), add color-coded indicators (green / yellow / red) where it makes sense.
-
-**Level 4 Checkpoint:** Your app displays data from an external API and reads/writes to Supabase on the same page. The interviewee (or a classmate playing their role) could look at this and get useful information.
+Hint: Coding agents can have docs as context, which will improve your implementation experience.
 
 ---
 
@@ -439,15 +104,16 @@ Even if all your touchpoints are desktop users, responsive design is good practi
 
 **Step 1: Test Your App at Phone Width**
 
-1. Open your running app in Chrome (or any browser)
-2. Press F12 to open DevTools
-3. Click the "Toggle device toolbar" button (it looks like a phone/tablet icon in the top-left of DevTools, or press Ctrl+Shift+M / Cmd+Shift+M)
-4. Select "iPhone 14 Pro" from the device dropdown (or any phone preset)
-5. Reload the page
+1. Open your running app in browser
+2. Open DevTools
+3. Select "iPhone 14 Pro" from the device dropdown (or any phone preset)
+4. Reload the page
+
+Safari can directly enter responsive design mode to inspect other screens.
 
 **Step 2: Note What Breaks**
 
-Check each of these items at phone width:
+Check the items below (if applicable) at phone width:
 
 | Element | Works at Phone Width? | What Breaks? |
 |---------|----------------------|--------------|
@@ -461,38 +127,15 @@ Check each of these items at phone width:
 
 **Step 3: Fix the Most Critical Issue**
 
-Pick the most severe breakage from your check and fix it. Common responsive fixes:
-
-**For Streamlit apps:**
-- Tables that overflow: Use `st.dataframe(df, use_container_width=True)` to make tables fit the screen width
-- Charts that are too small: Use `st.plotly_chart(fig, use_container_width=True)` for responsive charts
-- Sidebar content: Streamlit automatically collapses the sidebar on mobile -- make sure your app still works without the sidebar visible
-
-**For Next.js apps:**
-- Text that overflows: Use Tailwind's responsive utilities like `text-sm md:text-base` to adjust font sizes
-- Columns that stack poorly: Use `flex flex-col md:flex-row` to stack vertically on mobile and horizontally on desktop
-- Tables that overflow: Wrap in `<div className="overflow-x-auto">` to allow horizontal scrolling
-- Tap targets too small: Ensure buttons and links have at least `p-2` padding (minimum 44x44 pixels for touch targets)
+Pick the most severe breakage from your check and fix it. 
 
 **Record your results.** Note what broke and what you fixed. Include this in your Component B deliverables.
 
 ---
 
+### Deployment
 
-### Level 5: Stretch Goals
-
-Implement one of these structured challenges:
-
-**Option A: Add a Second API**
-- **Goal:** Integrate a second API alongside your first one. For example, combine weather data with news headlines, or population data with an image API.
-- **Guiding prompt:** "Add a second API call to [API name] and display the results alongside the existing data. Show both in separate tabs using st.tabs()."
-- **Checkpoint:** Your app displays data from two different APIs on the same page. Both have error handling.
-
-**Option B: CRUD with Validation (Supabase)**
-- **Goal:** Add input validation to your Supabase CRUD operations. Apply the assert verification pattern from Week 4 to ensure data integrity.
-- **Checkpoint:** Submitting empty fields shows a user-friendly error. Your assert statements verify that row counts match expectations after insert/delete.
-
-**Option C: Deploy to Vercel or Streamlit Cloud**
+**Deploy to Vercel or Streamlit Cloud (if your tech stack is Streamlit)**
 - **Goal:** Deploy your app so anyone with the URL can access it.
 - **Checkpoint:** The live URL works and shows your data. You have verified no secrets are exposed in the deployment.
 
@@ -503,18 +146,9 @@ Implement one of these structured challenges:
 Before you leave, verify:
 
 - [ ] **No hardcoded secrets** in your code files (API keys, Supabase keys must be in `.env` / `.env.local`)
-- [ ] **`.env` is in `.gitignore`** (and `.env.local` for Next.js)
+- [ ] **`.env` is in `.gitignore`** (and `.env.local` for Next.js). **For grading purpose, please submit the secrets. In the future, do not expose the secrets.**
 - [ ] **Error handling** on every API call and database operation (try/except or try/catch)
-- [ ] **Environment variables** loaded with `os.getenv()` (Python) or `process.env.` (JavaScript)
 
-Quick check:
-```bash
-# Run in your project directory:
-grep -r "eyJ" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.js" .
-grep -r "sk-" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.js" .
-```
-
-If either command returns results, you have a hardcoded secret. Move it to `.env` immediately.
 
 ---
 
@@ -603,25 +237,14 @@ You are done when:
 
 #### This Week's Decision Prompt
 
-> **"Why did you choose (or why would you choose) Streamlit (single-tier) versus Next.js + Supabase (multi-tier) for this week's problem?"**
 
-If you used the Tech Stack Decision Framework in the lab, reference the factors that mattered most.
+> **Pick one architecture decision _inside_ your chosen stack and justify it.**
 
-Think about:
-- Does the **interviewee's** problem (this week: equipment checkout / returns workflow) require multiple users with their own accounts, or is it a single-user tool?
-- Does data need to persist across sessions and be shared between users?
-- How fast did you need to prototype versus how production-ready does the result need to be?
-- What is the cost of switching stacks later if you start with the wrong one?
+Choose one of these prompts:
+- **Schema design:** Why did you choose this table structure (fields/relationships) for the workflow?
+- **Error strategy:** Why did you handle failures this way (retry, fallback UI, user message, logging)?
 
-#### Example Entry
-
-| Field | Example |
-|-------|---------|
-| **Decision** | Used Streamlit for the API explorer, then scaffolded a Next.js app for the incident tracker |
-| **Alternatives considered** | (1) Build everything in Streamlit, (2) Build everything in Next.js, (3) Use Streamlit with a local SQLite database |
-| **Why you chose this** | The API explorer is a single-user exploration tool -- Streamlit is perfect for that. The incident tracker needs multiple users and persistent shared data, which requires auth and a real database. |
-| **Trade-off** | I now maintain two apps in two languages. If I had used Next.js for everything, I would have one codebase but a slower start for the API explorer. |
-| **When would you choose differently?** | If staff only need a personal dashboard (no shared access), Streamlit + SQLite would be simpler and sufficient. If the project needed to be a single production app from the start, I would skip Streamlit and build everything in Next.js. |
+Your entry should reference your **C.2 diagram** and explain how this decision affects reliability, maintainability, or user experience.
 
 ---
 
@@ -635,25 +258,29 @@ Think about:
 
 #### What you are testing
 
-A **contract** between your app and an API is like a contract between a restaurant and a food supplier: the restaurant orders specific items in a specific format, and the supplier delivers specific items in a specific format. If either side breaks the contract (the restaurant orders something not on the menu, or the supplier delivers rotten produce), the system breaks.
+**Contract testing** in software verifies that two systems agree on the format and rules of their communication:
 
+- "I will send you a JSON object with fields `latitude` and `longitude`, both numbers"
+- "You will respond with a JSON object containing a `daily` field with an array of temperatures"
+- "If I send invalid data, you will respond with a 400 status code and an error message"
+- "If I send no authentication, you will respond with a 401 status code"
+
+The "contract" is the agreement about what inputs are valid, what outputs to expect, and how errors are communicated.
 Today you will test 3 scenarios that cover the most common ways the contract between your app and an API/database can break:
 
 1. **Valid input** -- Does the happy path work?
 2. **Invalid input** -- Does the API reject bad data gracefully?
 3. **Missing/wrong authentication** -- What happens without credentials?
 
+#### Why this matters
+
+- APIs change over time. A field that was optional becomes required. A response format changes. Contract tests catch these breaking changes before your users do.
+- When your app integrates multiple services (an API + a database + an AI model), each integration point is a potential failure. Contract tests verify each connection independently.
+- AI-generated code often makes assumptions about API response formats. A contract test verifies those assumptions are correct.
+
 #### Instructions
 
-**Step 1: Choose your API or database endpoint**
-
-Pick one API endpoint or Supabase operation from your app. Good candidates:
-
-- Your weather/data API call (from Level 1)
-- Your Supabase insert operation (from Level 2)
-- Your Supabase read/query operation (from Level 2)
-
-**Step 2: Test Case 1 -- Valid Input (Happy Path)**
+Pick one API endpoint or Supabase operation from your app. 
 
 Make a request with correct, expected input. For example:
 
@@ -661,91 +288,15 @@ Make a request with correct, expected input. For example:
 
 > **HTTP Status Codes Quick Reference:** APIs respond with numeric codes to tell you what happened. **200** = success (OK). **400** = bad request (you sent invalid data). **401** = unauthorized (missing or wrong API key). **403** = forbidden (you do not have permission). **404** = not found (wrong URL). **429** = too many requests (rate limited). **500** = server error (something broke on their end).
 
-```python
-# Valid API call -- should return 200 and data
-import requests
-
-response = requests.get(
-    "https://api.open-meteo.com/v1/forecast",
-    params={"latitude": 47.61, "longitude": -122.33, "daily": "temperature_2m_max"},
-    timeout=10
-)
-print(f"Status: {response.status_code}")
-print(f"Has data: {'daily' in response.json()}")
-```
-
-**If testing Supabase:** (Adapt table and column names if you used **bookmarks** or a custom schema instead of **incidents**.)
-
-```python
-# Valid Supabase insert -- should succeed
-result = supabase_client.table("incidents").insert({
-    "system_name": "Wi-Fi",
-    "status": "operational",
-    "description": "Test entry"
-}).execute()
-print(f"Success: {result.data is not None}")
-print(f"Rows returned: {len(result.data)}")
-```
-
 Record: What status code did you get? What data was returned? Does it match what you expected?
 
-**Step 3: Test Case 2 -- Invalid Input**
 
 Make a request with deliberately wrong or malformed input:
 
-**If testing an API:**
-
-```python
-# Invalid input -- latitude out of range
-response = requests.get(
-    "https://api.open-meteo.com/v1/forecast",
-    params={"latitude": 999, "longitude": -122.33, "daily": "temperature_2m_max"},
-    timeout=10
-)
-print(f"Status: {response.status_code}")
-print(f"Response: {response.text[:200]}")
-```
-
-**If testing Supabase:**
-
-```python
-# Invalid input -- missing required field
-result = supabase_client.table("incidents").insert({
-    "status": "operational"
-    # system_name is missing (required NOT NULL field)
-}).execute()
-```
-
 Record: Did the API/database reject the bad input? What error message did you get? Does your app handle this error gracefully (user-friendly message) or does it crash?
 
-**Step 4: Test Case 3 -- Missing or Wrong Authentication**
 
 Test what happens when credentials are missing or incorrect:
-
-**If testing an API that requires a key:**
-
-```python
-# Wrong API key
-response = requests.get(
-    "https://api.example.com/data",
-    headers={"Authorization": "Bearer WRONG_KEY"},
-    timeout=10
-)
-print(f"Status: {response.status_code}")  # Expected: 401 or 403
-```
-
-**If testing Supabase with RLS off (this week's setup):**
-
-```python
-# Test with empty/wrong Supabase key
-from supabase import create_client
-bad_client = create_client("https://your-project.supabase.co", "not-a-real-key")
-try:
-    result = bad_client.table("incidents").select("*").execute()
-    print(f"Unexpectedly succeeded: {result.data}")
-except Exception as e:
-    print(f"Correctly rejected: {type(e).__name__}: {e}")
-```
 
 Record: Did the service correctly reject the unauthenticated request? What error was returned?
 
@@ -753,7 +304,7 @@ Record: Did the service correctly reject the unauthenticated request? What error
 
 **Step 5: Record your results**
 
-Use the recording template below.
+Summarize the recorded results in the table below:
 
 #### Recording Template
 
@@ -772,51 +323,13 @@ Copy this table into your submission document:
 - Actual outcomes are documented with status codes and response details
 - All 3 tests either confirm correct behavior or identify a gap in your app's error handling
 
-#### API response asserts (Learning Objective 7)
+#### API response asserts
 
-Add **two** `assert` statements (Python or TypeScript) that check the **external API** you integrated in Component B (e.g., expected keys in JSON, numeric ranges). Place them where they run when you fetch data (or in a small test file). Point TAs to the file path in your README (see **Component D Deliverables**).
-
----
-
-### D.2 Quality Gate
-
-Before you submit, every item below must be satisfied:
-
-- [ ] **API/database test cases documented**: Your recording template has 3 complete rows covering valid input, invalid input, and auth/edge case scenarios
-- [ ] **Expected vs. actual recorded**: Each row shows what you expected AND what actually happened
-- [ ] **Status codes noted**: HTTP status codes or error types are documented for each test
-- [ ] **Error handling verified**: For the invalid input and auth tests, your app shows a user-friendly error message (not a raw traceback). If it does not, document that as a finding
-- [ ] **No hardcoded secrets**: Run the security check from the lab manual's Security Checklist. Confirm no API keys appear in your code files
-- [ ] **External API asserts**: Two asserts for your Component B API response are committed in the repo and the README lists where to find them
-
----
-
-### D.3 Testing Concept Preview: Contract Testing
-
-#### What is contract testing?
-
-**Contract testing** in software verifies that two systems agree on the format and rules of their communication:
-
-- "I will send you a JSON object with fields `latitude` and `longitude`, both numbers"
-- "You will respond with a JSON object containing a `daily` field with an array of temperatures"
-- "If I send invalid data, you will respond with a 400 status code and an error message"
-- "If I send no authentication, you will respond with a 401 status code"
-
-The "contract" is the agreement about what inputs are valid, what outputs to expect, and how errors are communicated.
-
-#### Why this matters
-
-- APIs change over time. A field that was optional becomes required. A response format changes. Contract tests catch these breaking changes before your users do.
-- When your app integrates multiple services (an API + a database + an AI model), each integration point is a potential failure. Contract tests verify each connection independently.
-- AI-generated code often makes assumptions about API response formats. A contract test verifies those assumptions are correct.
-
-Today you tested three aspects of the contract between your app and an external service: "does it accept valid input?", "does it reject invalid input?", and "does it enforce authentication?" These are the three most fundamental properties of any API contract. In professional settings, these tests run automatically every time the code changes.
+Add `assert` statements (Python or TypeScript) that check the **external API** you integrated in Component B (e.g., expected keys in JSON, numeric ranges). Place them where they run when you fetch data (or in a small test file). Po
 
 ---
 
 ## Component E: Applied Challenge — The API Connector
-
-**Canvas / grading:** Your instructor may list this on Canvas as part of **Assignment 2** or under another name. Whatever the title, submit the artifacts in **[Submission → Component E deliverables](#component-e-deliverables)** below (same GitHub repo as Components B–D unless you are told otherwise).
 
 ### The Problem
 
@@ -841,7 +354,7 @@ At each boundary between layers, label:
 ### Part 2: Implementation
 
 1. Create a Supabase table with a schema you design to capture event information
-2. Populate your table with sample data across multiple categories
+2. Populate your table with sample data (you create) across multiple categories
 3. Build a frontend page that:
    - Fetches events from Supabase
    - Displays them in a list or card layout
@@ -884,7 +397,7 @@ At each boundary between layers, label:
 
 ## Submission
 
-Submit a link to your **GitHub repo** on Canvas. Your README should document how to install, configure environment variables, and run the app so a TA can reproduce your results. If Canvas uses a different assignment title (e.g., **Assignment 2 — Data Explorer App**), it still maps to these components.
+Submit all your code and required deliverables on Github classroom (merge the review ready version to main branch for grading).
 
 ### Component A Deliverables
 
@@ -893,9 +406,11 @@ Submit a link to your **GitHub repo** on Canvas. Your README should document how
 
 ### Component B Deliverables
 
-1. **Screenshot** of your running app showing data from at least 1 external API and Supabase CRUD working (include a link to the API docs you used in your README)
-2. **Responsive design summary** — the completed checklist table from the [Responsive Design Check](#responsive-design-check) (or a short bullet list), including **one** issue you found at phone width and **what you changed** to fix it
-3. **Tech stack justification** — 1 sentence explaining why you chose Streamlit or Next.js for this problem (from your [Spec Checkpoint](../templates/spec-checkpoint-template.md))
+
+1. **Tech stack justification** — 1 sentence explaining why you chose Streamlit or Next.js for this problem (from your [Spec Checkpoint](../templates/spec-checkpoint-template.md))
+2. **Supabase schema report** — table/schema details for your data model (table names + key fields; screenshot or SQL is fine)
+3. **Responsive design summary** — completed checklist table from the [Responsive Design Check](#responsive-design-check) (or a short bullet list), including **one** issue you found at phone width and **what you changed** to fix it
+4. **Deployment URL** — live link to your deployed app (Vercel or Streamlit Cloud) and a note confirming you checked that no secrets are exposed
 
 ### Component C Deliverables
 
@@ -906,13 +421,13 @@ Submit a link to your **GitHub repo** on Canvas. Your README should document how
 
 ### Component D Deliverables
 
-1. **Validation results** from D.1 exercise (completed recording template)
-2. **Quality gate checklist** — all items checked from D.2
-3. **External API assert statements** — two asserts for your Component B API response (see [API response asserts](#api-response-asserts-learning-objective-7)). Commit them in the repo and add a **README** line with the **file path** (and function name if helpful) so TAs can find them quickly
+1. **Validation results** from D.1 exercise (completed recording template with 3 scenarios: valid, invalid, and missing-auth or third invalid variant)
+2. **External API assert statements** — assert checks for your Component B external API response (see [API response asserts](#api-response-asserts)). 
+3. **Error-handling note** — brief note (README or docs) on whether each D.1 scenario was handled gracefully in your app or revealed a gap
 
 ### Component E deliverables
 
-Submit as part of the **same repo** unless your instructor specifies otherwise.
+Submit as part of the **same repo**.
 
 1. **Working events UI** — code that reads from your **events** Supabase table and shows a **category filter** (screenshot in README is fine)
 2. **System architecture map** from **Component E → Part 1: Architecture & Design** (image/PDF in repo or attached on Canvas) with **data format** and **one potential error** labeled at each boundary
