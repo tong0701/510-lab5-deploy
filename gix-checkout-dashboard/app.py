@@ -30,16 +30,14 @@ EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _read_env(name: str) -> str:
-    v = (os.getenv(name) or "").strip()
-    if v:
-        return v
     try:
-        sec = st.secrets
-        if name in sec:
-            return str(sec[name]).strip()
-    except Exception:
+        val = st.secrets[name]
+        s = str(val).strip()
+        if s:
+            return s
+    except (KeyError, FileNotFoundError, TypeError, AttributeError):
         pass
-    return ""
+    return (os.getenv(name) or "").strip()
 
 
 def get_supabase_client():
@@ -47,13 +45,14 @@ def get_supabase_client():
         url = _read_env("SUPABASE_URL")
         key = _read_env("SUPABASE_KEY")
         if not url or not key:
-            return None
+            return None, "missing_creds"
         client = create_client(url, key)
         if client is None:
-            return None
-        return client
-    except Exception:
-        return None
+            return None, "client_none"
+        return client, None
+    except Exception as exc:
+        logger.warning("Supabase create_client failed: %s", exc)
+        return None, "client_error"
 
 
 def fetch_weather_banner() -> str | None:
@@ -191,9 +190,17 @@ st.set_page_config(page_title="GIX Checkout", layout="centered")
 st.title("GIX equipment checkouts")
 st.caption("See what you have out and when it is due.")
 
-client = get_supabase_client()
+client, supabase_err = get_supabase_client()
 if client is None:
-    st.error("Cannot reach the database. Try refreshing.")
+    if supabase_err == "missing_creds":
+        st.error(
+            "Database credentials are missing. For Streamlit Cloud, open "
+            "the app **Settings → Secrets** and add SUPABASE_URL and "
+            "SUPABASE_KEY (TOML), then **Reboot** or redeploy. Locally, copy "
+            ".env.example to .env and fill both values."
+        )
+    else:
+        st.error("Cannot reach the database. Check your Supabase URL and key in Secrets, then try again.")
     st.stop()
 
 with st.form("email_form"):
