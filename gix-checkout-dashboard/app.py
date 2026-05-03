@@ -333,7 +333,12 @@ def render_events_tab() -> None:
         return
 
     if not all_categories:
-        st.info("No event categories found yet.")
+        st.info(
+            "No rows in the **events** table yet, or every row is missing "
+            "**category**. In Supabase, open the SQL Editor and run the script "
+            "**`docs/events_seed.sql`** from this project (same repo as "
+            "`app.py`), then refresh this page."
+        )
         return
 
     selected = st.multiselect(
