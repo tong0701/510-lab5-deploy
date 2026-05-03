@@ -41,3 +41,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python / Streamlit (GIX checkout dashboard)
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
