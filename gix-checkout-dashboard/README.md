@@ -74,7 +74,9 @@ insert into checkouts (student_email, item_name, item_category, checkout_date, d
 
 ## Contract tests
 
-These tests call the real Open-Meteo API (no key). From the project root with the venv active:
+`pytest.ini` sets `pythonpath = .` so tests can import `data` and `app` helpers.
+
+These tests call the real Open-Meteo API (no key) and the real Supabase `events` table for Component E (needs `.env` with valid credentials). From the project root with the venv active:
 
 ```bash
 pytest tests/

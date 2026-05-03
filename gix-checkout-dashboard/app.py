@@ -16,6 +16,12 @@ import requests
 import streamlit as st
 from supabase import create_client
 
+from data import (
+    fetch_checkouts as db_fetch_checkouts,
+    fetch_event_categories,
+    fetch_events_with_client,
+)
+
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
@@ -40,7 +46,7 @@ def _read_env(name: str) -> str:
     return (os.getenv(name) or "").strip()
 
 
-def get_supabase_client():
+def get_supabase_client() -> tuple[Any | None, str | None]:
     try:
         url = _read_env("SUPABASE_URL")
         key = _read_env("SUPABASE_KEY")
@@ -55,7 +61,15 @@ def get_supabase_client():
         return None, "client_error"
 
 
-def fetch_weather_banner() -> str | None:
+@st.cache_resource
+def get_supabase() -> Any | None:
+    client, err = get_supabase_client()
+    if err is not None or client is None:
+        return None
+    return client
+
+
+def fetch_weather() -> str | None:
     try:
         resp = requests.get(WEATHER_URL, timeout=5)
         if resp.status_code != 200:
@@ -133,6 +147,11 @@ def fmt_short(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%b %d, %Y")
 
 
+def fmt_event_date(dt: datetime) -> str:
+    d = dt.astimezone(timezone.utc)
+    return f"{d:%a}, {d:%b} {d.day}, {d:%Y}"
+
+
 def render_active_checkout_card(row: dict[str, Any], now: datetime) -> None:
     due = parse_ts(row["due_date"])
     co = parse_ts(row["checkout_date"])
@@ -185,89 +204,199 @@ def layout_checkout_cards(
                 render_one(row)
 
 
-st.set_page_config(page_title="GIX Checkout", layout="centered")
+def _event_row_valid(row: dict[str, Any]) -> bool:
+    return bool(
+        row.get("title")
+        and row.get("event_date")
+        and row.get("category")
+    )
 
-st.title("GIX equipment checkouts")
-st.caption("See what you have out and when it is due.")
 
-client, supabase_err = get_supabase_client()
-if client is None:
-    if supabase_err == "missing_creds":
-        st.error(
-            "Database credentials are missing. For Streamlit Cloud, open "
-            "the app **Settings → Secrets** and add SUPABASE_URL and "
-            "SUPABASE_KEY (TOML), then **Reboot** or redeploy. Locally, copy "
-            ".env.example to .env and fill both values."
+def render_header() -> None:
+    st.title("GIX student dashboard")
+    st.caption(
+        "Check your equipment loans and browse upcoming GIX events."
+    )
+
+
+def fetch_checkouts(email: str) -> list[dict[str, Any]]:
+    client = get_supabase()
+    if client is None:
+        return []
+    return db_fetch_checkouts(client, email)
+
+
+def render_checkouts_tab() -> None:
+    client = get_supabase()
+    if client is None:
+        _, err = get_supabase_client()
+        if err == "missing_creds":
+            st.error(
+                "Database credentials are missing. For Streamlit Cloud, open "
+                "the app **Settings → Secrets** and add SUPABASE_URL and "
+                "SUPABASE_KEY (TOML), then **Reboot** or redeploy. Locally, copy "
+                ".env.example to .env and fill both values."
+            )
+        else:
+            st.error(
+                "Cannot reach the database. Check your Supabase URL and key in "
+                "Secrets, then try again."
+            )
+        return
+
+    st.subheader("Equipment checkouts")
+    st.caption("See what you have out and when it is due.")
+
+    with st.form("email_form"):
+        email_input = st.text_input(
+            "Your email",
+            placeholder="netid@uw.edu",
+            help="Same email staff use for your checkout record.",
         )
+        submitted = st.form_submit_button("Show my checkouts")
+
+    hint = fetch_weather()
+    if hint:
+        st.info(hint)
+
+    if submitted:
+        st.session_state["dashboard_email"] = (email_input or "").strip()
+
+    lookup_email = st.session_state.get("dashboard_email", "").strip()
+
+    if not lookup_email:
+        return
+
+    if not EMAIL_PATTERN.match(lookup_email):
+        st.warning("Please enter a valid email address.")
+        return
+
+    try:
+        rows = fetch_checkouts(lookup_email)
+    except Exception:
+        st.error("Cannot reach the database. Try refreshing.")
+        return
+
+    if not rows:
+        st.info("No checkouts found for this email.")
+        return
+
+    now = datetime.now(timezone.utc)
+    active = [r for r in rows if not r.get("returned")]
+    returned = [r for r in rows if r.get("returned")]
+
+    active.sort(key=lambda r: parse_ts(r["due_date"]))
+
+    st.subheader("Active checkouts")
+    if not active:
+        st.write("No active checkouts.")
     else:
-        st.error("Cannot reach the database. Check your Supabase URL and key in Secrets, then try again.")
-    st.stop()
-
-with st.form("email_form"):
-    email_input = st.text_input(
-        "Your email",
-        placeholder="netid@uw.edu",
-        help="Same email staff use for your checkout record.",
-    )
-    submitted = st.form_submit_button("Show my checkouts")
-
-hint = fetch_weather_banner()
-if hint:
-    st.info(hint)
-
-if submitted:
-    st.session_state["dashboard_email"] = (email_input or "").strip()
-
-lookup_email = st.session_state.get("dashboard_email", "").strip()
-
-if not lookup_email:
-    st.stop()
-
-if not EMAIL_PATTERN.match(lookup_email):
-    st.warning("Please enter a valid email address.")
-    st.stop()
-
-try:
-    result = (
-        client.table("checkouts")
-        .select("*")
-        .ilike("student_email", lookup_email.strip())
-        .execute()
-    )
-    rows: list[dict[str, Any]] = result.data or []
-except Exception:
-    st.error("Cannot reach the database. Try refreshing.")
-    st.stop()
-
-if not rows:
-    st.info("No checkouts found for this email.")
-    st.stop()
-
-now = datetime.now(timezone.utc)
-active = [r for r in rows if not r.get("returned")]
-returned = [r for r in rows if r.get("returned")]
-
-active.sort(key=lambda r: parse_ts(r["due_date"]))
-
-st.subheader("Active checkouts")
-if not active:
-    st.write("No active checkouts.")
-else:
-    layout_checkout_cards(
-        active,
-        lambda r: render_active_checkout_card(r, now),
-        single_row_max=3,
-        wrapped_cols=2,
-    )
-
-with st.expander("Returned history"):
-    if not returned:
-        st.write("No returned items on file.")
-    else:
-        returned.sort(key=lambda r: parse_ts(r["due_date"]), reverse=True)
         layout_checkout_cards(
-            returned,
-            render_returned_card,
+            active,
+            lambda r: render_active_checkout_card(r, now),
             single_row_max=3,
             wrapped_cols=2,
         )
+
+    with st.expander("Returned history"):
+        if not returned:
+            st.write("No returned items on file.")
+        else:
+            returned.sort(
+                key=lambda r: parse_ts(r["due_date"]), reverse=True
+            )
+            layout_checkout_cards(
+                returned,
+                render_returned_card,
+                single_row_max=3,
+                wrapped_cols=2,
+            )
+
+
+def render_events_tab() -> None:
+    st.subheader("Upcoming GIX events")
+    st.caption("Filter by category to see what is coming up.")
+
+    client = get_supabase()
+    if client is None:
+        st.error(
+            "Cannot reach the events database. Try refreshing."
+        )
+        return
+
+    try:
+        all_categories = fetch_event_categories(client)
+    except Exception:
+        st.error(
+            "Cannot reach the events database. Try refreshing."
+        )
+        return
+
+    if not all_categories:
+        st.info("No event categories found yet.")
+        return
+
+    selected = st.multiselect(
+        "Categories",
+        options=all_categories,
+        default=all_categories,
+    )
+
+    if not selected:
+        st.info("Select at least one category to see events.")
+        return
+
+    try:
+        raw_events = fetch_events_with_client(client, selected)
+    except Exception:
+        st.error(
+            "Cannot reach the events database. Try refreshing."
+        )
+        return
+
+    valid_events: list[dict[str, Any]] = []
+    skipped = 0
+    for row in raw_events:
+        if _event_row_valid(row):
+            valid_events.append(row)
+        else:
+            skipped += 1
+
+    st.caption(f"Showing {len(valid_events)} events")
+
+    if not valid_events:
+        st.info(
+            "No events match these categories. Try selecting more."
+        )
+        if skipped:
+            st.warning(
+                f"{skipped} events were hidden due to missing data."
+            )
+        return
+
+    for row in valid_events:
+        ed = parse_ts(str(row["event_date"]))
+        with st.container(border=True):
+            st.markdown(f"**{row['title']}**")
+            st.markdown(f":violet[**{row['category']}**]")
+            st.write(fmt_event_date(ed))
+            st.write(row.get("location") or "Location TBD")
+            st.write(row.get("description") or "")
+
+    if skipped:
+        st.warning(
+            f"{skipped} events were hidden due to missing data."
+        )
+
+
+st.set_page_config(page_title="GIX Checkout", layout="centered")
+
+render_header()
+
+tab_checkouts, tab_events = st.tabs(["My checkouts", "GIX events"])
+
+with tab_checkouts:
+    render_checkouts_tab()
+
+with tab_events:
+    render_events_tab()
